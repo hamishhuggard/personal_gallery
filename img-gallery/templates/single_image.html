@@ -39,12 +39,77 @@
         .back-button:hover {
             background-color: #0056b3;
         }
+        .navigation-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 20px auto;
+            max-width: 600px;
+            padding: 0 20px;
+        }
+        .nav-button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+            margin: 0 10px;
+        }
+        .nav-button:hover {
+            background-color: #0056b3;
+        }
+        .nav-button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .image-counter {
+            font-size: 1.1em;
+            color: #666;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
     <div class="image-viewer">
+
         <h1 class="image-title">{{ image_title }}</h1>
+        
+        <div class="navigation-container">
+            {% if prev_image_path %}
+                <a href="/image/{{ prev_image_path }}" class="nav-button">← Previous</a>
+            {% else %}
+                <span class="nav-button" style="background-color: #ccc; cursor: not-allowed;">← Previous</span>
+            {% endif %}
+            
+            <span class="image-counter">{{ current_index }} of {{ total_images }}</span>
+            
+            {% if next_image_path %}
+                <a href="/image/{{ next_image_path }}" class="nav-button">Next →</a>
+            {% else %}
+                <span class="nav-button" style="background-color: #ccc; cursor: not-allowed;">Next →</span>
+            {% endif %}
+        </div>
+
         <img src="{{ image_url }}" alt="{{ image_title }}">
+
+        <div class="navigation-container">
+            {% if prev_image_path %}
+                <a href="/image/{{ prev_image_path }}" class="nav-button">← Previous</a>
+            {% else %}
+                <span class="nav-button" style="background-color: #ccc; cursor: not-allowed;">← Previous</span>
+            {% endif %}
+            
+            <span class="image-counter">{{ current_index }} of {{ total_images }}</span>
+            
+            {% if next_image_path %}
+                <a href="/image/{{ next_image_path }}" class="nav-button">Next →</a>
+            {% else %}
+                <span class="nav-button" style="background-color: #ccc; cursor: not-allowed;">Next →</span>
+            {% endif %}
+        </div>
+        
         <p><a href="{{ back_url }}" class="back-button">Back to Gallery</a></p>
     </div>
 </body>

@@ -110,6 +110,14 @@ async def read_single_image(request: Request, image_path: str):
     if image_path not in cached_image_list:
         raise HTTPException(status_code=404, detail="Image not found")
 
+    # Find current image index and get navigation info
+    current_index = cached_image_list.index(image_path)
+    total_images = len(cached_image_list)
+    
+    # Get next and previous image paths
+    next_image_path = cached_image_list[current_index + 1] if current_index < total_images - 1 else None
+    prev_image_path = cached_image_list[current_index - 1] if current_index > 0 else None
+
     full_image_url = f"/full_images/{image_path}"
     
     return templates.TemplateResponse(
@@ -118,6 +126,10 @@ async def read_single_image(request: Request, image_path: str):
             "request": request,
             "image_url": full_image_url,
             "image_title": Path(image_path).name,
-            "back_url": request.headers.get("referer", "/gallery") # Go back to previous page or gallery root
+            "back_url": request.headers.get("referer", "/gallery"), # Go back to previous page or gallery root
+            "next_image_path": next_image_path,
+            "prev_image_path": prev_image_path,
+            "current_index": current_index + 1,  # 1-based for display
+            "total_images": total_images
         }
     )
