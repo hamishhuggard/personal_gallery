@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All Images Gallery - Page {{ current_page }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .gallery-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 10px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .gallery-item {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+            background-color: #fff;
+            text-align: center;
+            transition: transform 0.2s;
+        }
+        .gallery-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .gallery-item img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+        .gallery-item a {
+            text-decoration: none;
+            color: inherit;
+            display: block;
+            padding: 5px;
+        }
+        .gallery-item .title {
+            font-size: 0.9em;
+            padding: 5px 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .pagination {
+            text-align: center;
+            margin: 30px auto;
+            padding: 10px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            max-width: 1200px;
+        }
+        .pagination a, .pagination span {
+            display: inline-block;
+            padding: 8px 15px;
+            margin: 0 5px;
+            border: 1px solid #007bff;
+            border-radius: 5px;
+            text-decoration: none;
+            color: #007bff;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .pagination a:hover {
+            background-color: #007bff;
+            color: white;
+        }
+        .pagination .current-page {
+            background-color: #007bff;
+            color: white;
+            font-weight: bold;
+            border-color: #007bff;
+        }
+        h1 { text-align: center; color: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>All Images Gallery</h1>
+
+    <div class="pagination">
+        {% if has_prev %}
+            <a href="/gallery/{{ prev_page }}">Previous</a>
+        {% else %}
+            <span>Previous</span>
+        {% endif %}
+
+        <span>Page {{ current_page }} of {{ total_pages }}</span>
+
+        {% if has_next %}
+            <a href="/gallery/{{ next_page }}">Next</a>
+        {% else %}
+            <span>Next</span>
+        {% endif %}
+    </div>
+
+    <div class="gallery-container">
+        {% for item in gallery_items %}
+            <div class="gallery-item">
+                <a href="/image/{{ item.full_url.split('/full_images/')[1] }}">
+                    <img src="{{ item.small_url }}" alt="{{ item.title }}" loading="lazy">
+                    <!--
+                    <div class="title">{{ item.title }}</div>
+-->
+                </a>
+            </div>
+        {% endfor %}
+    </div>
+
+    <div class="pagination">
+        {% if has_prev %}
+            <a href="/gallery/{{ prev_page }}">Previous</a>
+        {% else %}
+            <span>Previous</span>
+        {% endif %}
+
+        <span>Page {{ current_page }} of {{ total_pages }}</span>
+
+        {% if has_next %}
+            <a href="/gallery/{{ next_page }}">Next</a>
+        {% else %}
+            <span>Next</span>
+        {% endif %}
+    </div>
+</body>
+</html>

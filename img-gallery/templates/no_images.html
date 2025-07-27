@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>No Images</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; text-align: center; }
+        .container {
+            margin-top: 50px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #fff;
+            display: inline-block; /* To center the block itself */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 { color: #cc0000; }
+        p { color: #555; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>:(</h1>
+        <p>{{ message }}</p>
+        <p>Please ensure you have images in the `{{ ORIGINAL_IMAGES_DIR }}` directory and have run the `resize_images.py` script.</p>
+    </div>
+</body>
+</html>
