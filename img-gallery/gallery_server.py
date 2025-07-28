@@ -1,10 +1,12 @@
 # gallery_server.py
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 import os
+from PIL import Image
+import numpy as np
 
 app = FastAPI()
 
@@ -51,6 +53,79 @@ def get_all_image_paths(base_dir: str):
 # In a production environment, you might want a more sophisticated caching
 # or a mechanism to refresh this list if new images are added.
 cached_image_list = get_all_image_paths(ORIGINAL_IMAGES_DIR)
+
+# --- Helper Function to Crop Image ---
+def crop_image_to_content(image_path: str, margin_percent: float = 0.1):
+    """
+    Crops an image to the bounding box of non-white and non-alpha pixels,
+    with an additional margin around the content.
+    
+    Args:
+        image_path: Path to the image file
+        margin_percent: Percentage of margin to add (default 0.1 = 10%)
+    
+    Returns:
+        bool: True if cropping was successful, False otherwise
+    """
+    try:
+        # Open the image
+        with Image.open(image_path) as img:
+            # Convert to RGBA if not already
+            if img.mode != 'RGBA':
+                img = img.convert('RGBA')
+            
+            # Convert to numpy array for easier processing
+            img_array = np.array(img)
+            
+            # Create a mask for non-white and non-transparent pixels
+            # Non-white: not (R=255, G=255, B=255)
+            # Non-transparent: A > 0
+            non_white = ~((img_array[:, :, 0] == 255) & 
+                         (img_array[:, :, 1] == 255) & 
+                         (img_array[:, :, 2] == 255))
+            non_transparent = img_array[:, :, 3] > 0
+            
+            # Combined mask: pixels that are both non-white and non-transparent
+            content_mask = non_white & non_transparent
+            
+            # Find the bounding box of content
+            if not np.any(content_mask):
+                # No content found, return False
+                return False
+            
+            # Get coordinates of non-zero elements
+            rows = np.any(content_mask, axis=1)
+            cols = np.any(content_mask, axis=0)
+            
+            # Find the boundaries
+            top = np.where(rows)[0][0]
+            bottom = np.where(rows)[0][-1]
+            left = np.where(cols)[0][0]
+            right = np.where(cols)[0][-1]
+            
+            # Calculate margin
+            width = right - left
+            height = bottom - top
+            margin = max(margin_percent * width, margin_percent * height)
+            margin = int(margin)
+            
+            # Apply margin (ensure we don't go outside image bounds)
+            top = max(0, top - margin)
+            bottom = min(img.height, bottom + margin)
+            left = max(0, left - margin)
+            right = min(img.width, right + margin)
+            
+            # Crop the image
+            cropped_img = img.crop((left, top, right, bottom))
+            
+            # Save the cropped image back to the same path
+            cropped_img.save(image_path, quality=95)
+            
+            return True
+            
+    except Exception as e:
+        print(f"Error cropping image {image_path}: {e}")
+        return False
 
 # --- Routes ---
 
@@ -133,3 +208,26 @@ async def read_single_image(request: Request, image_path: str):
             "total_images": total_images
         }
     )
+
+@app.get("/crop/{image_path:path}")
+async def crop_image(request: Request, image_path: str):
+    """
+    Crops an image to its content with a 10% margin and redirects back to the image view.
+    """
+    # Check if the image path exists in our cached list for validation
+    if image_path not in cached_image_list:
+        raise HTTPException(status_code=404, detail="Image not found")
+    
+    # Construct the full path to the image file
+    full_image_path = os.path.join(ORIGINAL_IMAGES_DIR, image_path)
+    
+    # Perform the cropping
+    success = crop_image_to_content(full_image_path)
+    
+    if success:
+        # Redirect back to the image view
+        return RedirectResponse(url=f"/image/{image_path}", status_code=302)
+    else:
+        # If cropping failed, redirect back with an error message
+        # For now, just redirect back - you could add flash messages later
+        return RedirectResponse(url=f"/image/{image_path}", status_code=302)
