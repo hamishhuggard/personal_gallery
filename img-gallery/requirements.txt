@@ -1,0 +1,6 @@
+Pillow
+tqdm
+fastapi
+uvicorn
+Jinja2
+imagehash
