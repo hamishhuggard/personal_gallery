@@ -82,6 +82,11 @@
 </head>
 <body>
     <h1>All Images Gallery</h1>
+    {% if admin_mode %}
+    <div style="text-align:center; margin-bottom: 20px;">
+        <a href="/admin/edit/{{ current_page }}" style="display:inline-block; padding:10px 20px; background:#28a745; color:white; border-radius:5px; text-decoration:none; font-weight:bold;">Edit This Page</a>
+    </div>
+    {% endif %}
 
     <div class="pagination">
         {% if has_prev %}

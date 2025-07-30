@@ -1,13 +1,15 @@
 # gallery_server.py
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 import os
 from utils.crop_utils import crop_image_to_content
+from db import init_db, get_session, ImageMeta
 
 app = FastAPI()
+init_db()
 
 # Mount static directories
 # The full-size images will be served from /full_images
@@ -23,6 +25,7 @@ templates = Jinja2Templates(directory="templates")
 ORIGINAL_IMAGES_DIR = "./imgs"
 SMALL_IMAGES_DIR = "./imgs-small"
 IMAGES_PER_PAGE = 100 # Adjusted from 100 as per your request
+ADMIN_MODE = True  # Set to False to disable admin features
 
 # --- Helper Function to Get All Images ---
 def get_all_image_paths(base_dir: str):
@@ -100,6 +103,7 @@ async def read_gallery(request: Request, page_num: int = 1):
             "has_prev": page_num > 1,
             "next_page": page_num + 1,
             "prev_page": page_num - 1,
+            "admin_mode": ADMIN_MODE,
         }
     )
 
@@ -108,21 +112,28 @@ async def read_single_image(request: Request, image_path: str, from_page: int = 
     """
     Serves a single full-size image page.
     """
-    # Check if the image path exists in our cached list for validation
     if image_path not in cached_image_list:
         raise HTTPException(status_code=404, detail="Image not found")
 
-    # Find current image index and get navigation info
     current_index = cached_image_list.index(image_path)
     total_images = len(cached_image_list)
-    
-    # Get next and previous image paths
     next_image_path = cached_image_list[current_index + 1] if current_index < total_images - 1 else None
     prev_image_path = cached_image_list[current_index - 1] if current_index > 0 else None
-
     full_image_url = f"/full_images/{image_path}"
-    
-    # Determine back URL - prefer from_page parameter, then referer, then default to gallery
+
+    # Get metadata from DB
+    session = get_session()
+    meta = session.query(ImageMeta).filter_by(path=image_path).first()
+    session.close()
+    if meta:
+        image_title = meta.title if meta.title else Path(image_path).stem
+        image_description = meta.description or None
+        image_date = meta.date or None
+    else:
+        image_title = Path(image_path).stem
+        image_description = None
+        image_date = None
+
     if from_page is not None:
         back_url = f"/gallery/{from_page}"
     else:
@@ -131,13 +142,15 @@ async def read_single_image(request: Request, image_path: str, from_page: int = 
             back_url = referer
         else:
             back_url = "/gallery"
-    
+
     return templates.TemplateResponse(
         "single_image.html",
         {
             "request": request,
             "image_url": full_image_url,
-            "image_title": Path(image_path).stem,
+            "image_title": image_title,
+            "image_description": image_description,
+            "image_date": image_date,
             "back_url": back_url,
             "next_image_path": next_image_path,
             "prev_image_path": prev_image_path,
@@ -168,3 +181,77 @@ async def crop_image(request: Request, image_path: str):
         # If cropping failed, redirect back with an error message
         # For now, just redirect back - you could add flash messages later
         return RedirectResponse(url=f"/image/{image_path}", status_code=302)
+
+@app.get("/admin/edit/{page_num}", response_class=HTMLResponse)
+async def edit_gallery_page(request: Request, page_num: int):
+    if not ADMIN_MODE:
+        raise HTTPException(status_code=403, detail="Admin mode is disabled.")
+
+    # Get images for this page
+    total_images = len(cached_image_list)
+    total_pages = (total_images + IMAGES_PER_PAGE - 1) // IMAGES_PER_PAGE
+    if not (1 <= page_num <= total_pages):
+        raise HTTPException(status_code=404, detail="Page not found")
+    start_index = (page_num - 1) * IMAGES_PER_PAGE
+    end_index = min(start_index + IMAGES_PER_PAGE, total_images)
+    images_on_page = cached_image_list[start_index:end_index]
+
+    # Fetch metadata for these images
+    session = get_session()
+    meta_dict = {meta.path: meta for meta in session.query(ImageMeta).filter(ImageMeta.path.in_(images_on_page)).all()}
+    session.close()
+
+    # Prepare data for template
+    edit_items = []
+    for img_path in images_on_page:
+        meta = meta_dict.get(img_path)
+        edit_items.append({
+            "path": img_path,
+            "small_url": f"/small_images/{img_path}",
+            "full_url": f"/full_images/{img_path}",
+            "title": meta.title if meta and meta.title else Path(img_path).stem,
+            "description": meta.description if meta else "",
+            "is_public": meta.is_public if meta else True,
+            "date": meta.date if meta else "",
+        })
+
+    return templates.TemplateResponse(
+        "edit_gallery_page.html",
+        {
+            "request": request,
+            "edit_items": edit_items,
+            "current_page": page_num,
+            "total_pages": total_pages,
+        }
+    )
+
+@app.post("/admin/edit/{page_num}", response_class=HTMLResponse)
+async def save_gallery_page_edits(request: Request, page_num: int):
+    if not ADMIN_MODE:
+        raise HTTPException(status_code=403, detail="Admin mode is disabled.")
+
+    form = await request.form()
+    num_items = int(form.get("num_items", 0))
+
+    session = get_session()
+    for i in range(num_items):
+        path = form.get(f"path_{i}")
+        title = form.get(f"title_{i}")
+        description = form.get(f"description_{i}")
+        is_public = form.get(f"is_public_{i}") == "1"
+        date = form.get(f"date_{i}")
+
+        # Upsert logic
+        meta = session.query(ImageMeta).filter_by(path=path).first()
+        if not meta:
+            meta = ImageMeta(path=path)
+            session.add(meta)
+        meta.title = title
+        meta.description = description
+        meta.is_public = is_public
+        meta.date = date
+    session.commit()
+    session.close()
+
+    # After saving, redirect back to the edit page
+    return RedirectResponse(url=f"/admin/edit/{page_num}", status_code=303)
