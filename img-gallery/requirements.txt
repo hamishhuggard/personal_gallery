@@ -4,3 +4,4 @@ fastapi
 uvicorn
 Jinja2
 imagehash
+python-multipart
