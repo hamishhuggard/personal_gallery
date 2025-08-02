@@ -84,7 +84,10 @@
     <h1>All Images Gallery</h1>
     {% if admin_mode %}
     <div style="text-align:center; margin-bottom: 20px;">
-        <a href="/admin/edit/{{ current_page }}" style="display:inline-block; padding:10px 20px; background:#28a745; color:white; border-radius:5px; text-decoration:none; font-weight:bold;">Edit This Page</a>
+        <a href="/admin/edit/{{ current_page }}" style="display:inline-block; padding:10px 20px; background:#28a745; color:white; border-radius:5px; text-decoration:none; font-weight:bold; margin-right:10px;">Edit This Page</a>
+        <form method="post" action="/refresh" style="display:inline;">
+            <button type="submit" style="display:inline-block; padding:10px 20px; background:#007bff; color:white; border:1px solid #007bff; border-radius:5px; text-decoration:none; font-weight:bold; cursor:pointer;">Refresh Gallery</button>
+        </form>
     </div>
     {% endif %}
 

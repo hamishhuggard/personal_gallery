@@ -7,6 +7,8 @@ from pathlib import Path
 import os
 from utils.crop_utils import crop_image_to_content
 from db import init_db, get_session, ImageMeta
+import subprocess
+import sys
 
 app = FastAPI()
 init_db()
@@ -56,6 +58,48 @@ def get_all_image_paths(base_dir: str):
 # In a production environment, you might want a more sophisticated caching
 # or a mechanism to refresh this list if new images are added.
 cached_image_list = get_all_image_paths(ORIGINAL_IMAGES_DIR)
+
+def refresh_images():
+    """
+    Run the downsizing script to create medium and small images, then refresh the cache.
+    """
+    try:
+        # Run downsizing for medium images (600px)
+        print("Creating medium images (600px)...")
+        result1 = subprocess.run([
+            sys.executable, "create_downsized_images.py",
+            "--input", "./imgs",
+            "--output", "./imgs-medium", 
+            "--max_dim", "600"
+        ], capture_output=True, text=True, cwd=".")
+        
+        if result1.returncode != 0:
+            print(f"Error creating medium images: {result1.stderr}")
+            return False
+            
+        # Run downsizing for small images (300px)
+        print("Creating small images (300px)...")
+        result2 = subprocess.run([
+            sys.executable, "create_downsized_images.py",
+            "--input", "./imgs",
+            "--output", "./imgs-small",
+            "--max_dim", "300"
+        ], capture_output=True, text=True, cwd=".")
+        
+        if result2.returncode != 0:
+            print(f"Error creating small images: {result2.stderr}")
+            return False
+            
+        # Refresh the cached image list
+        global cached_image_list
+        cached_image_list = get_all_image_paths(ORIGINAL_IMAGES_DIR)
+        
+        print("Image refresh completed successfully!")
+        return True
+        
+    except Exception as e:
+        print(f"Error during image refresh: {e}")
+        return False
 
 # --- Routes ---
 
@@ -255,3 +299,18 @@ async def save_gallery_page_edits(request: Request, page_num: int):
 
     # After saving, redirect back to the edit page
     return RedirectResponse(url=f"/admin/edit/{page_num}", status_code=303)
+
+@app.post("/refresh")
+async def refresh_gallery():
+    """
+    Refresh the gallery by running the downsizing script and updating the cache.
+    """
+    if not ADMIN_MODE:
+        raise HTTPException(status_code=403, detail="Admin mode is disabled.")
+    
+    success = refresh_images()
+    
+    if success:
+        return RedirectResponse(url="/gallery", status_code=303)
+    else:
+        raise HTTPException(status_code=500, detail="Failed to refresh images")
