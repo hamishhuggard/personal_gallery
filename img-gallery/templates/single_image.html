@@ -103,9 +103,7 @@
         {% if image_date %}
         <div style="color:#888; font-size:1em; margin-bottom:8px;">Date: {{ image_date }}</div>
         {% endif %}
-        {% if image_description %}
-        <div style="margin: 10px 0; font-size:1.1em;">{{ image_description | safe }}</div>
-        {% endif %}
+
         
         <div class="navigation-container">
             {% if prev_image_path %}
@@ -123,7 +121,16 @@
             {% endif %}
         </div>
 
+        <div class="action-buttons">
+            <a href="/crop/{{ image_url.split('/full_images/')[1] }}" class="crop-button">Crop Image</a>
+            <a href="{{ back_url }}" class="back-button">Back to Gallery</a>
+        </div>
+
         <img src="{{ image_url }}" alt="{{ image_title }}">
+
+        {% if image_description %}
+        <div style="margin: 10px 0; font-size:1.1em; max-width: 600px; margin-left: auto; margin-right: auto; white-space: pre-wrap; text-align: left;">{{ image_description | safe }}</div>
+        {% endif %}
 
         <div class="navigation-container">
             {% if prev_image_path %}
