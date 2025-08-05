@@ -54,12 +54,18 @@
 </head>
 <body>
     <h1>Edit Gallery Page {{ current_page }}</h1>
+    <div style="text-align:center; margin-top:30px;">
+        <a href="/gallery/{{ current_page }}">Back to Gallery</a>
+    </div>
     <form method="post" action="/admin/edit/{{ current_page }}">
+        <button type="submit" class="save-btn">Save</button>
         <table>
             <tr>
                 <th>Image</th>
                 <th>Title</th>
                 <th>Description (HTML allowed)</th>
+                <th>Tags (comma-separated)</th>
+                <th>Drawings Count</th>
                 <th>Crop</th>
                 <th>Public?</th>
                 <th>Date</th>
@@ -76,6 +82,12 @@
                 </td>
                 <td>
                     <textarea name="description_{{ loop.index0 }}">{{ item.description }}</textarea>
+                </td>
+                <td>
+                    <input type="text" name="tags_{{ loop.index0 }}" value="{{ item.tags }}" placeholder="tag1, tag2, tag3">
+                </td>
+                <td>
+                    <input type="number" name="drawings_count_{{ loop.index0 }}" value="{{ item.drawings_count }}" min="1" style="width: 80px;">
                 </td>
                 <td>
                     <a href="/crop/{{ item.path }}?from_page={{ current_page }}" class="crop-btn" target="_blank">Crop</a>

@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 import os
 from utils.crop_utils import crop_image_to_content
-from db import init_db, get_session, ImageMeta
+from db import init_db, get_session, ImageMeta, Tag
 import subprocess
 import sys
 
@@ -173,10 +173,14 @@ async def read_single_image(request: Request, image_path: str, from_page: int = 
         image_title = meta.title if meta.title else Path(image_path).stem
         image_description = meta.description or None
         image_date = meta.date or None
+        image_tags = [tag.name for tag in meta.tags] if meta.tags else []
+        image_drawings_count = meta.drawings_count
     else:
         image_title = Path(image_path).stem
         image_description = None
         image_date = None
+        image_tags = []
+        image_drawings_count = 1
 
     if from_page is not None:
         back_url = f"/gallery/{from_page}"
@@ -195,6 +199,8 @@ async def read_single_image(request: Request, image_path: str, from_page: int = 
             "image_title": image_title,
             "image_description": image_description,
             "image_date": image_date,
+            "image_tags": image_tags,
+            "image_drawings_count": image_drawings_count,
             "back_url": back_url,
             "next_image_path": next_image_path,
             "prev_image_path": prev_image_path,
@@ -257,6 +263,8 @@ async def edit_gallery_page(request: Request, page_num: int):
             "description": meta.description if meta else "",
             "is_public": meta.is_public if meta else True,
             "date": meta.date if meta else "",
+            "drawings_count": meta.drawings_count if meta else 1,
+            "tags": ", ".join([tag.name for tag in meta.tags]) if meta and meta.tags else "",
         })
 
     return templates.TemplateResponse(
@@ -284,6 +292,8 @@ async def save_gallery_page_edits(request: Request, page_num: int):
         description = form.get(f"description_{i}")
         is_public = form.get(f"is_public_{i}") == "1"
         date = form.get(f"date_{i}")
+        drawings_count = int(form.get(f"drawings_count_{i}", 1))
+        tags_str = form.get(f"tags_{i}", "")
 
         # Upsert logic
         meta = session.query(ImageMeta).filter_by(path=path).first()
@@ -294,6 +304,21 @@ async def save_gallery_page_edits(request: Request, page_num: int):
         meta.description = description
         meta.is_public = is_public
         meta.date = date
+        meta.drawings_count = drawings_count
+
+        # Handle tags
+        if tags_str.strip():
+            tag_names = [tag.strip() for tag in tags_str.split(',') if tag.strip()]
+            meta.tags = []
+            for tag_name in tag_names:
+                tag = session.query(Tag).filter_by(name=tag_name).first()
+                if not tag:
+                    tag = Tag(name=tag_name)
+                    session.add(tag)
+                meta.tags.append(tag)
+        else:
+            meta.tags = []
+
     session.commit()
     session.close()
 
