@@ -94,16 +94,79 @@
         .action-buttons .crop-button {
             margin-right: 10px;
         }
+        .image-tags {
+            margin: 15px 0;
+            text-align: center;
+        }
+        .tag-link {
+            display: inline-block;
+            background: #e9ecef;
+            color: #495057;
+            padding: 4px 8px;
+            border-radius: 12px;
+            margin: 2px 4px;
+            text-decoration: none;
+            font-size: 0.9em;
+            transition: background-color 0.2s, color 0.2s;
+        }
+        .tag-link:hover {
+            background: #007bff;
+            color: white;
+        }
+        .image-meta {
+            margin: 10px 0;
+            color: #666;
+            font-size: 0.95em;
+        }
+        .navigation-links {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .nav-link {
+            display: inline-block;
+            padding: 8px 16px;
+            background-color: #6c757d;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 0 5px;
+            transition: background-color 0.3s;
+            font-size: 0.9em;
+        }
+        .nav-link:hover {
+            background-color: #5a6268;
+        }
+        .nav-link.primary {
+            background-color: #007bff;
+        }
+        .nav-link.primary:hover {
+            background-color: #0056b3;
+        }
     </style>
 </head>
 <body>
     <div class="image-viewer">
 
         <h1 class="image-title">{{ image_title }}</h1>
-        {% if image_date %}
-        <div style="color:#888; font-size:1em; margin-bottom:8px;">Date: {{ image_date }}</div>
+        
+        {% if image_date or image_tags or image_drawings_count %}
+        <div class="image-meta">
+            {% if image_date %}
+            <div style="margin-bottom: 8px;">Date: {{ image_date }}</div>
+            {% endif %}
+            {% if image_tags %}
+            <div class="image-tags">
+                Tags: 
+                {% for tag in image_tags %}
+                <a href="/tag/{{ tag }}" class="tag-link">{{ tag }}</a>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if image_drawings_count and image_drawings_count > 1 %}
+            <div style="margin-top: 8px;">Drawings: {{ image_drawings_count }}</div>
+            {% endif %}
+        </div>
         {% endif %}
-
         
         <div class="navigation-container">
             {% if prev_image_path %}
@@ -151,6 +214,11 @@
         <div class="action-buttons">
             <a href="/crop/{{ image_url.split('/full_images/')[1] }}" class="crop-button">Crop Image</a>
             <a href="{{ back_url }}" class="back-button">Back to Gallery</a>
+        </div>
+        
+        <div class="navigation-links">
+            <a href="/gallery" class="nav-link primary">All Images</a>
+            <a href="/tags" class="nav-link">All Tags</a>
         </div>
     </div>
 </body>

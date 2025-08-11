@@ -151,6 +151,98 @@ async def read_gallery(request: Request, page_num: int = 1):
         }
     )
 
+@app.get("/tags", response_class=HTMLResponse)
+async def list_tags(request: Request):
+    """
+    Lists all available tags with image counts.
+    """
+    session = get_session()
+    tags = session.query(Tag).all()
+    
+    # Get image count for each tag
+    tag_data = []
+    for tag in tags:
+        image_count = len(tag.images)
+        tag_data.append({
+            "name": tag.name,
+            "count": image_count
+        })
+    
+    # Sort by count (descending) then by name
+    tag_data.sort(key=lambda x: (-x["count"], x["name"]))
+    
+    session.close()
+    
+    return templates.TemplateResponse(
+        "tags_list.html",
+        {
+            "request": request,
+            "tags": tag_data,
+            "admin_mode": ADMIN_MODE,
+        }
+    )
+
+@app.get("/tag/{tag_name}", response_class=HTMLResponse)
+@app.get("/tag/{tag_name}/{page_num}", response_class=HTMLResponse)
+async def tag_gallery(request: Request, tag_name: str, page_num: int = 1):
+    """
+    Shows a gallery of images with a specific tag.
+    """
+    session = get_session()
+    tag = session.query(Tag).filter_by(name=tag_name).first()
+    
+    if not tag:
+        raise HTTPException(status_code=404, detail="Tag not found")
+    
+    # Get all images with this tag
+    tagged_images = [img.path for img in tag.images if img.path in cached_image_list]
+    
+    if not tagged_images:
+        return templates.TemplateResponse("no_images.html", {
+            "request": request, 
+            "message": f"No images found with tag '{tag_name}'."
+        })
+    
+    total_images = len(tagged_images)
+    total_pages = (total_images + IMAGES_PER_PAGE - 1) // IMAGES_PER_PAGE
+    
+    if not (1 <= page_num <= total_pages):
+        raise HTTPException(status_code=404, detail="Page not found")
+    
+    start_index = (page_num - 1) * IMAGES_PER_PAGE
+    end_index = min(start_index + IMAGES_PER_PAGE, total_images)
+    
+    images_on_page = tagged_images[start_index:end_index]
+    
+    # Prepare image data for template
+    gallery_items = []
+    for img_relative_path in images_on_page:
+        small_image_url = f"/small_images/{img_relative_path}"
+        full_image_url = f"/full_images/{img_relative_path}"
+        gallery_items.append({
+            "small_url": small_image_url,
+            "full_url": full_image_url,
+            "title": Path(img_relative_path).name
+        })
+    
+    session.close()
+    
+    return templates.TemplateResponse(
+        "tag_gallery.html",
+        {
+            "request": request,
+            "tag_name": tag_name,
+            "gallery_items": gallery_items,
+            "current_page": page_num,
+            "total_pages": total_pages,
+            "has_next": page_num < total_pages,
+            "has_prev": page_num > 1,
+            "next_page": page_num + 1,
+            "prev_page": page_num - 1,
+            "admin_mode": ADMIN_MODE,
+        }
+    )
+
 @app.get("/image/{image_path:path}", response_class=HTMLResponse)
 async def read_single_image(request: Request, image_path: str, from_page: int = None):
     """
@@ -249,6 +341,10 @@ async def edit_gallery_page(request: Request, page_num: int):
     # Fetch metadata for these images
     session = get_session()
     meta_dict = {meta.path: meta for meta in session.query(ImageMeta).filter(ImageMeta.path.in_(images_on_page)).all()}
+    
+    # Get all available tags for the tag selector
+    all_tags = [tag.name for tag in session.query(Tag).order_by(Tag.name).all()]
+    
     session.close()
 
     # Prepare data for template
@@ -272,6 +368,7 @@ async def edit_gallery_page(request: Request, page_num: int):
         {
             "request": request,
             "edit_items": edit_items,
+            "all_tags": all_tags,
             "current_page": page_num,
             "total_pages": total_pages,
         }

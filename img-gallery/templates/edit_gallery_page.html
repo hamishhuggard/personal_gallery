@@ -50,15 +50,120 @@
             display: block;
         }
         .save-btn:hover { background: #e0a800; }
+        .tag-input-container {
+            position: relative;
+        }
+        .tag-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ccc;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            max-height: 150px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+        .tag-suggestion {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+        .tag-suggestion:hover {
+            background: #f0f0f0;
+        }
+        .tag-suggestion:last-child {
+            border-bottom: none;
+        }
+        .tag-suggestion .tag-name {
+            font-weight: bold;
+        }
+        .tag-suggestion .tag-count {
+            font-size: 0.8em;
+            color: #666;
+            margin-left: 8px;
+        }
+        .navigation-links {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .nav-link {
+            display: inline-block;
+            padding: 8px 16px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 0 5px;
+            transition: background-color 0.3s;
+        }
+        .nav-link:hover {
+            background-color: #0056b3;
+        }
+        .nav-link.secondary {
+            background-color: #6c757d;
+        }
+        .nav-link.secondary:hover {
+            background-color: #5a6268;
+        }
     </style>
+    <script>
+        function showTagSuggestions(inputElement) {
+            const suggestions = document.getElementById('tag-suggestions-' + inputElement.id);
+            if (suggestions) {
+                suggestions.style.display = 'block';
+            }
+        }
+        
+        function hideTagSuggestions(inputElement) {
+            const suggestions = document.getElementById('tag-suggestions-' + inputElement.id);
+            if (suggestions) {
+                setTimeout(() => {
+                    if (suggestions) {
+                        suggestions.style.display = 'none';
+                    }
+                }, 200);
+            }
+        }
+        
+        function selectTag(inputElement, tagName) {
+            inputElement.value = tagName;
+            hideTagSuggestions(inputElement);
+        }
+        
+        function filterTags(inputElement) {
+            const filterValue = inputElement.value.toLowerCase();
+            const suggestions = document.getElementById('tag-suggestions-' + inputElement.id);
+            if (suggestions) {
+                const tagItems = suggestions.querySelectorAll('.tag-suggestion');
+                tagItems.forEach(item => {
+                    const tagName = item.querySelector('.tag-name').textContent.toLowerCase();
+                    if (tagName.includes(filterValue)) {
+                        item.style.display = 'block';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            }
+        }
+    </script>
 </head>
 <body>
     <h1>Edit Gallery Page {{ current_page }}</h1>
-    <div style="text-align:center; margin-top:30px;">
-        <a href="/gallery/{{ current_page }}">Back to Gallery</a>
+    
+    <div class="navigation-links">
+        <a href="/gallery/{{ current_page }}" class="nav-link">Back to Gallery</a>
+        <a href="/tags" class="nav-link secondary">View All Tags</a>
+        {% if admin_mode %}
+        <a href="/admin/edit/{{ current_page }}" class="nav-link">Edit This Page</a>
+        {% endif %}
     </div>
+    
     <form method="post" action="/admin/edit/{{ current_page }}">
-        <button type="submit" class="save-btn">Save</button>
+        <button type="submit" class="save-btn">Save Changes</button>
         <table>
             <tr>
                 <th>Image</th>
@@ -84,7 +189,23 @@
                     <textarea name="description_{{ loop.index0 }}">{{ item.description }}</textarea>
                 </td>
                 <td>
-                    <input type="text" name="tags_{{ loop.index0 }}" value="{{ item.tags }}" placeholder="tag1, tag2, tag3">
+                    <div class="tag-input-container">
+                        <input type="text" 
+                               id="tags_{{ loop.index0 }}" 
+                               name="tags_{{ loop.index0 }}" 
+                               value="{{ item.tags }}" 
+                               placeholder="tag1, tag2, tag3"
+                               onfocus="showTagSuggestions(this)"
+                               onblur="hideTagSuggestions(this)"
+                               oninput="filterTags(this)">
+                        <div id="tag-suggestions-tags_{{ loop.index0 }}" class="tag-suggestions">
+                            {% for tag in all_tags %}
+                            <div class="tag-suggestion" onclick="selectTag(document.getElementById('tags_{{ loop.index0 }}'), '{{ tag }}')">
+                                <span class="tag-name">{{ tag }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
                 </td>
                 <td>
                     <input type="number" name="drawings_count_{{ loop.index0 }}" value="{{ item.drawings_count }}" min="1" style="width: 80px;">
@@ -105,10 +226,12 @@
             {% endfor %}
         </table>
         <input type="hidden" name="num_items" value="{{ edit_items|length }}">
-        <button type="submit" class="save-btn">Save</button>
+        <button type="submit" class="save-btn">Save Changes</button>
     </form>
-    <div style="text-align:center; margin-top:30px;">
-        <a href="/gallery/{{ current_page }}">Back to Gallery</a>
+    
+    <div class="navigation-links">
+        <a href="/gallery/{{ current_page }}" class="nav-link">Back to Gallery</a>
+        <a href="/tags" class="nav-link secondary">View All Tags</a>
     </div>
 </body>
 </html> 
