@@ -2,6 +2,8 @@ from sqlalchemy import create_engine, Column, String, Boolean, DateTime, Text, I
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
+import sqlite3
+import os
 
 DB_PATH = 'sqlite:///gallery_metadata.db'
 Base = declarative_base()
@@ -33,9 +35,58 @@ class ImageMeta(Base):
 engine = create_engine(DB_PATH, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(bind=engine)
 
+def migrate_database():
+    """Migrate the database to add missing columns."""
+    db_path = "gallery_metadata.db"
+    
+    if not os.path.exists(db_path):
+        print("Database file not found. Creating new database...")
+        return
+    
+    print(f"Checking database schema: {db_path}")
+    
+    # Connect to the database
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    try:
+        # Check if drawings_count column exists
+        cursor.execute("PRAGMA table_info(images)")
+        columns = [column[1] for column in cursor.fetchall()]
+        
+        if 'drawings_count' not in columns:
+            print("Adding drawings_count column...")
+            cursor.execute("ALTER TABLE images ADD COLUMN drawings_count INTEGER DEFAULT 1")
+            print("✓ Added drawings_count column")
+        
+        if 'created_at' not in columns:
+            print("Adding created_at column...")
+            cursor.execute("ALTER TABLE images ADD COLUMN created_at DATETIME")
+            print("✓ Added created_at column")
+            
+        if 'updated_at' not in columns:
+            print("Adding updated_at column...")
+            cursor.execute("ALTER TABLE images ADD COLUMN updated_at DATETIME")
+            print("✓ Added updated_at column")
+        
+        # Commit the changes
+        conn.commit()
+        print("✓ Database schema check completed!")
+        
+    except Exception as e:
+        print(f"Error during schema check: {e}")
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
 # Create tables if they don't exist
 def init_db():
+    # First create tables with current schema
     Base.metadata.create_all(engine)
+    
+    # Then migrate any existing database
+    migrate_database()
 
 # Helper to get a session
 def get_session():
