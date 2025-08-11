@@ -157,21 +157,23 @@ async def list_tags(request: Request):
     Lists all available tags with image counts.
     """
     session = get_session()
-    tags = session.query(Tag).all()
-    
-    # Get image count for each tag
-    tag_data = []
-    for tag in tags:
-        image_count = len(tag.images)
-        tag_data.append({
-            "name": tag.name,
-            "count": image_count
-        })
-    
-    # Sort by count (descending) then by name
-    tag_data.sort(key=lambda x: (-x["count"], x["name"]))
-    
-    session.close()
+    try:
+        from sqlalchemy.orm import joinedload
+        tags = session.query(Tag).options(joinedload(Tag.images)).all()
+        
+        # Get image count for each tag
+        tag_data = []
+        for tag in tags:
+            image_count = len(tag.images)
+            tag_data.append({
+                "name": tag.name,
+                "count": image_count
+            })
+        
+        # Sort by count (descending) then by name
+        tag_data.sort(key=lambda x: (-x["count"], x["name"]))
+    finally:
+        session.close()
     
     return templates.TemplateResponse(
         "tags_list.html",
@@ -189,43 +191,45 @@ async def tag_gallery(request: Request, tag_name: str, page_num: int = 1):
     Shows a gallery of images with a specific tag.
     """
     session = get_session()
-    tag = session.query(Tag).filter_by(name=tag_name).first()
-    
-    if not tag:
-        raise HTTPException(status_code=404, detail="Tag not found")
-    
-    # Get all images with this tag
-    tagged_images = [img.path for img in tag.images if img.path in cached_image_list]
-    
-    if not tagged_images:
-        return templates.TemplateResponse("no_images.html", {
-            "request": request, 
-            "message": f"No images found with tag '{tag_name}'."
-        })
-    
-    total_images = len(tagged_images)
-    total_pages = (total_images + IMAGES_PER_PAGE - 1) // IMAGES_PER_PAGE
-    
-    if not (1 <= page_num <= total_pages):
-        raise HTTPException(status_code=404, detail="Page not found")
-    
-    start_index = (page_num - 1) * IMAGES_PER_PAGE
-    end_index = min(start_index + IMAGES_PER_PAGE, total_images)
-    
-    images_on_page = tagged_images[start_index:end_index]
-    
-    # Prepare image data for template
-    gallery_items = []
-    for img_relative_path in images_on_page:
-        small_image_url = f"/small_images/{img_relative_path}"
-        full_image_url = f"/full_images/{img_relative_path}"
-        gallery_items.append({
-            "small_url": small_image_url,
-            "full_url": full_image_url,
-            "title": Path(img_relative_path).name
-        })
-    
-    session.close()
+    try:
+        from sqlalchemy.orm import joinedload
+        tag = session.query(Tag).options(joinedload(Tag.images)).filter_by(name=tag_name).first()
+        
+        if not tag:
+            raise HTTPException(status_code=404, detail="Tag not found")
+        
+        # Get all images with this tag
+        tagged_images = [img.path for img in tag.images if img.path in cached_image_list]
+        
+        if not tagged_images:
+            return templates.TemplateResponse("no_images.html", {
+                "request": request, 
+                "message": f"No images found with tag '{tag_name}'."
+            })
+        
+        total_images = len(tagged_images)
+        total_pages = (total_images + IMAGES_PER_PAGE - 1) // IMAGES_PER_PAGE
+        
+        if not (1 <= page_num <= total_pages):
+            raise HTTPException(status_code=404, detail="Page not found")
+        
+        start_index = (page_num - 1) * IMAGES_PER_PAGE
+        end_index = min(start_index + IMAGES_PER_PAGE, total_images)
+        
+        images_on_page = tagged_images[start_index:end_index]
+        
+        # Prepare image data for template
+        gallery_items = []
+        for img_relative_path in images_on_page:
+            small_image_url = f"/small_images/{img_relative_path}"
+            full_image_url = f"/full_images/{img_relative_path}"
+            gallery_items.append({
+                "small_url": small_image_url,
+                "full_url": full_image_url,
+                "title": Path(img_relative_path).name
+            })
+    finally:
+        session.close()
     
     return templates.TemplateResponse(
         "tag_gallery.html",
@@ -257,22 +261,26 @@ async def read_single_image(request: Request, image_path: str, from_page: int = 
     prev_image_path = cached_image_list[current_index - 1] if current_index > 0 else None
     full_image_url = f"/full_images/{image_path}"
 
-    # Get metadata from DB
+    # Get metadata from DB with tags eagerly loaded
     session = get_session()
-    meta = session.query(ImageMeta).filter_by(path=image_path).first()
-    session.close()
-    if meta:
-        image_title = meta.title if meta.title else Path(image_path).stem
-        image_description = meta.description or None
-        image_date = meta.date or None
-        image_tags = [tag.name for tag in meta.tags] if meta.tags else []
-        image_drawings_count = meta.drawings_count
-    else:
-        image_title = Path(image_path).stem
-        image_description = None
-        image_date = None
-        image_tags = []
-        image_drawings_count = 1
+    try:
+        from sqlalchemy.orm import joinedload
+        meta = session.query(ImageMeta).options(joinedload(ImageMeta.tags)).filter_by(path=image_path).first()
+        
+        if meta:
+            image_title = meta.title if meta.title else Path(image_path).stem
+            image_description = meta.description or None
+            image_date = meta.date or None
+            image_tags = [tag.name for tag in meta.tags] if meta.tags else []
+            image_drawings_count = meta.drawings_count or 1
+        else:
+            image_title = Path(image_path).stem
+            image_description = None
+            image_date = None
+            image_tags = []
+            image_drawings_count = 1
+    finally:
+        session.close()
 
     if from_page is not None:
         back_url = f"/gallery/{from_page}"
@@ -338,30 +346,48 @@ async def edit_gallery_page(request: Request, page_num: int):
     end_index = min(start_index + IMAGES_PER_PAGE, total_images)
     images_on_page = cached_image_list[start_index:end_index]
 
-    # Fetch metadata for these images
+    # Fetch metadata for these images with tags eagerly loaded
     session = get_session()
-    meta_dict = {meta.path: meta for meta in session.query(ImageMeta).filter(ImageMeta.path.in_(images_on_page)).all()}
-    
-    # Get all available tags for the tag selector
-    all_tags = [tag.name for tag in session.query(Tag).order_by(Tag.name).all()]
-    
-    session.close()
-
-    # Prepare data for template
-    edit_items = []
-    for img_path in images_on_page:
-        meta = meta_dict.get(img_path)
-        edit_items.append({
-            "path": img_path,
-            "small_url": f"/small_images/{img_path}",
-            "full_url": f"/full_images/{img_path}",
-            "title": meta.title if meta and meta.title else Path(img_path).stem,
-            "description": meta.description if meta else "",
-            "is_public": meta.is_public if meta else True,
-            "date": meta.date if meta else "",
-            "drawings_count": meta.drawings_count if meta else 1,
-            "tags": ", ".join([tag.name for tag in meta.tags]) if meta and meta.tags else "",
-        })
+    try:
+        # Use joinedload to eagerly load the tags relationship
+        from sqlalchemy.orm import joinedload
+        meta_list = session.query(ImageMeta).options(joinedload(ImageMeta.tags)).filter(ImageMeta.path.in_(images_on_page)).all()
+        meta_dict = {meta.path: meta for meta in meta_list}
+        
+        # Get all available tags for the tag selector
+        all_tags = [tag.name for tag in session.query(Tag).order_by(Tag.name).all()]
+        
+        # Prepare data for template - extract all data we need while session is open
+        edit_items = []
+        for img_path in images_on_page:
+            meta = meta_dict.get(img_path)
+            if meta:
+                edit_items.append({
+                    "path": img_path,
+                    "small_url": f"/small_images/{img_path}",
+                    "full_url": f"/full_images/{img_path}",
+                    "title": meta.title if meta.title else Path(img_path).stem,
+                    "description": meta.description if meta.description else "",
+                    "is_public": meta.is_public if meta.is_public is not None else True,
+                    "date": meta.date if meta.date else "",
+                    "drawings_count": meta.drawings_count if meta.drawings_count else 1,
+                    "tags": ", ".join([tag.name for tag in meta.tags]) if meta.tags else "",
+                })
+            else:
+                # No metadata exists for this image, create default entry
+                edit_items.append({
+                    "path": img_path,
+                    "small_url": f"/small_images/{img_path}",
+                    "full_url": f"/full_images/{img_path}",
+                    "title": Path(img_path).stem,
+                    "description": "",
+                    "is_public": True,
+                    "date": "",
+                    "drawings_count": 1,
+                    "tags": "",
+                })
+    finally:
+        session.close()
 
     return templates.TemplateResponse(
         "edit_gallery_page.html",
@@ -383,41 +409,46 @@ async def save_gallery_page_edits(request: Request, page_num: int):
     num_items = int(form.get("num_items", 0))
 
     session = get_session()
-    for i in range(num_items):
-        path = form.get(f"path_{i}")
-        title = form.get(f"title_{i}")
-        description = form.get(f"description_{i}")
-        is_public = form.get(f"is_public_{i}") == "1"
-        date = form.get(f"date_{i}")
-        drawings_count = int(form.get(f"drawings_count_{i}", 1))
-        tags_str = form.get(f"tags_{i}", "")
+    try:
+        for i in range(num_items):
+            path = form.get(f"path_{i}")
+            title = form.get(f"title_{i}")
+            description = form.get(f"description_{i}")
+            is_public = form.get(f"is_public_{i}") == "1"
+            date = form.get(f"date_{i}")
+            drawings_count = int(form.get(f"drawings_count_{i}", 1))
+            tags_str = form.get(f"tags_{i}", "")
 
-        # Upsert logic
-        meta = session.query(ImageMeta).filter_by(path=path).first()
-        if not meta:
-            meta = ImageMeta(path=path)
-            session.add(meta)
-        meta.title = title
-        meta.description = description
-        meta.is_public = is_public
-        meta.date = date
-        meta.drawings_count = drawings_count
+            # Upsert logic
+            meta = session.query(ImageMeta).filter_by(path=path).first()
+            if not meta:
+                meta = ImageMeta(path=path)
+                session.add(meta)
+            meta.title = title
+            meta.description = description
+            meta.is_public = is_public
+            meta.date = date
+            meta.drawings_count = drawings_count
 
-        # Handle tags
-        if tags_str.strip():
-            tag_names = [tag.strip() for tag in tags_str.split(',') if tag.strip()]
-            meta.tags = []
-            for tag_name in tag_names:
-                tag = session.query(Tag).filter_by(name=tag_name).first()
-                if not tag:
-                    tag = Tag(name=tag_name)
-                    session.add(tag)
-                meta.tags.append(tag)
-        else:
-            meta.tags = []
+            # Handle tags
+            if tags_str.strip():
+                tag_names = [tag.strip() for tag in tags_str.split(',') if tag.strip()]
+                meta.tags = []
+                for tag_name in tag_names:
+                    tag = session.query(Tag).filter_by(name=tag_name).first()
+                    if not tag:
+                        tag = Tag(name=tag_name)
+                        session.add(tag)
+                    meta.tags.append(tag)
+            else:
+                meta.tags = []
 
-    session.commit()
-    session.close()
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    finally:
+        session.close()
 
     # After saving, redirect back to the edit page
     return RedirectResponse(url=f"/admin/edit/{page_num}", status_code=303)
