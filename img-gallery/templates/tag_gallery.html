@@ -77,6 +77,41 @@
             font-weight: bold;
             border-color: #007bff;
         }
+        .pagination .page-select {
+            padding: 6px 8px;
+            border: 1px solid #007bff;
+            border-radius: 4px;
+            background-color: white;
+            color: #007bff;
+            font-size: 14px;
+            cursor: pointer;
+            margin: 0 5px;
+        }
+        .pagination .page-select:focus {
+            outline: none;
+            border-color: #0056b3;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }
+        .pagination .go-btn {
+            padding: 8px 12px;
+            background-color: #007bff;
+            color: white;
+            border: 1px solid #007bff;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-left: 5px;
+            transition: background-color 0.3s;
+        }
+        .pagination .go-btn:hover {
+            background-color: #0056b3;
+        }
+        .pagination .skip-btn {
+            background-color: #6c757d;
+            border-color: #6c757d;
+        }
+        .pagination .skip-btn:hover {
+            background-color: #5a6268;
+        }
         h1 { text-align: center; color: #0056b3; }
         .tag-header {
             text-align: center;
@@ -116,6 +151,13 @@
             background-color: #0056b3;
         }
     </style>
+    <script>
+        function goToPage(selectId) {
+            const pageSelect = document.getElementById(selectId);
+            const pageNum = parseInt(pageSelect.value);
+            window.location.href = '/tag/{{ tag_name }}/' + pageNum;
+        }
+    </script>
 </head>
 <body>
     <div class="tag-header">
@@ -133,17 +175,25 @@
 
     <div class="pagination">
         {% if has_prev %}
-            <a href="/tag/{{ tag_name }}/{{ prev_page }}">Previous</a>
+            <a href="/tag/{{ tag_name }}/1" class="skip-btn">« First</a>
+            <a href="/tag/{{ tag_name }}/{{ prev_page }}">← Previous</a>
         {% else %}
-            <span>Previous</span>
+            <span class="skip-btn">« First</span>
+            <span>← Previous</span>
         {% endif %}
 
-        <span>Page {{ current_page }} of {{ total_pages }}</span>
+        <span>Page <select id="pageSelect" class="page-select" onchange="goToPage('pageSelect')">
+            {% for i in range(1, total_pages + 1) %}
+                <option value="{{ i }}" {% if i == current_page %}selected{% endif %}>{{ i }}</option>
+            {% endfor %}
+        </select> of {{ total_pages }}</span>
 
         {% if has_next %}
-            <a href="/tag/{{ tag_name }}/{{ next_page }}">Next</a>
+            <a href="/tag/{{ tag_name }}/{{ next_page }}">Next →</a>
+            <a href="/tag/{{ tag_name }}/{{ total_pages }}" class="skip-btn">Last »</a>
         {% else %}
-            <span>Next</span>
+            <span>Next →</span>
+            <span class="skip-btn">Last »</span>
         {% endif %}
     </div>
 
@@ -159,17 +209,25 @@
 
     <div class="pagination">
         {% if has_prev %}
-            <a href="/tag/{{ tag_name }}/{{ prev_page }}">Previous</a>
+            <a href="/tag/{{ tag_name }}/1" class="skip-btn">« First</a>
+            <a href="/tag/{{ tag_name }}/{{ prev_page }}">← Previous</a>
         {% else %}
-            <span>Previous</span>
+            <span class="skip-btn">« First</span>
+            <span>← Previous</span>
         {% endif %}
 
-        <span>Page {{ current_page }} of {{ total_pages }}</span>
+        <span>Page <select id="pageSelect2" class="page-select" onchange="goToPage('pageSelect2')">
+            {% for i in range(1, total_pages + 1) %}
+                <option value="{{ i }}" {% if i == current_page %}selected{% endif %}>{{ i }}</option>
+            {% endfor %}
+        </select> of {{ total_pages }}</span>
 
         {% if has_next %}
-            <a href="/tag/{{ tag_name }}/{{ next_page }}">Next</a>
+            <a href="/tag/{{ tag_name }}/{{ next_page }}">Next →</a>
+            <a href="/tag/{{ tag_name }}/{{ total_pages }}" class="skip-btn">Last »</a>
         {% else %}
-            <span>Next</span>
+            <span>Next →</span>
+            <span class="skip-btn">Last »</span>
         {% endif %}
     </div>
     
